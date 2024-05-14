@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Babylon.js sample code</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
+    <script src="https://assets.babylonjs.com/generated/Assets.js"></script>
+    <script src="https://cdn.babylonjs.com/recast.js"></script>
+    <script src="https://cdn.babylonjs.com/ammo.js"></script>
+    <script src="https://cdn.babylonjs.com/havok/HavokPhysics_umd.js"></script>
+    <script src="https://cdn.babylonjs.com/cannon.js"></script>
+    <script src="https://cdn.babylonjs.com/Oimo.js"></script>
+    <script src="https://cdn.babylonjs.com/earcut.min.js"></script>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+    <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
+    <script src="https://cdn.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+    <script src="https://cdn.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+    <script src="https://cdn.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+
+    <style>
+        html, body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+
+        #canvasZone {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+<div id="canvasZone">
+    <canvas id="renderCanvas"></canvas>
+</div>
+<script>
+    var canvas = document.getElementById("renderCanvas");
+
+    var startRenderLoop = function (engine, canvas) {
+        engine.runRenderLoop(function () {
+            if (sceneToRender && sceneToRender.activeCamera) {
+                sceneToRender.render();
+            }
+        });
+    }
+
+    var engine = null;
+    var scene = null;
+    var sceneToRender = null;
+    var createDefaultEngine = function () {
+        return new BABYLON.Engine(canvas, true, {
+            preserveDrawingBuffer: true,
+            stencil: true,
+            disableWebGL2Support: false
+        });
+    };
+    var createScene = function () {
+        // This creates a basic Babylon Scene object (non-mesh)
+        var scene = new BABYLON.Scene(engine);
+
+        var camera = new BABYLON.ArcRotateCamera("camera", BABYLON.Tools.ToRadians(90), BABYLON.Tools.ToRadians(65), 10, BABYLON.Vector3.Zero(), scene);
+
+        // This attaches the camera to the canvas
+        camera.attachControl(canvas, true);
+
+        // Créer une lumière avec une position plus haute
+        var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+        // Réduire davantage l'intensité de la lumière
+        light.intensity = 0.2;
+
+        // Our built-in 'ground' shape.
+        var ground = BABYLON.MeshBuilder.CreateGround("ground", {width: 50, height: 10}, scene);
+        let groundMaterial = new BABYLON.StandardMaterial("Ground Material", scene);
+        ground.material = groundMaterial;
+
+        let groundTexture = new BABYLON.Texture("https://cdn.discordapp.com/attachments/922504391435628627/1184854798701436968/abstract-vector-stone-wall-seamless-cartoon-pattern_503161-36.png?ex=658d7d05&is=657b0805&hm=43f22055b740f5c5404c4af849f7e8dc994eb58e3c6b3ab94a80e62ca2d4c675&", scene);
+
+        // Répéter la texture sur le sol
+        groundTexture.uScale = 10;
+        groundTexture.vScale = 2;
+
+        groundMaterial.diffuseTexture = groundTexture;
+
+        // Appel à la fonction pour générer des obstacles
+        generateObstacles(scene);
+
+        // Create a body-like mesh
+        var body = BABYLON.MeshBuilder.CreateCylinder("body", {diameterTop: 1, diameterBottom: 1, height: 2}, scene);
+        body.position = new BABYLON.Vector3(2, 0.5, 0);
+
+        // Animation for the body
+        var bodyAnimation = new BABYLON.Animation("bodyAnimation", "position.y", 30, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+        keys = [];
+        keys.push({frame: 0, value: 1});
+        keys.push({frame: 45, value: 2.5});
+        keys.push({frame: 90, value: 1});
+        bodyAnimation.setKeys(keys);
+        body.animations = [];
+        body.animations.push(bodyAnimation);
+        scene.beginAnimation(body, 0, 90, true);
+
+        // Medal light effect
+        var medalLight = new BABYLON.PointLight("medalLight", new BABYLON.Vector3(5, 8, 10), scene);
+        medalLight.diffuse = new BABYLON.Color3(1, 1, 0);
+        medalLight.intensity = 15;
+
+        return scene;
+    };
+
+    // Fonction pour générer des obstacles de manière aléatoire
+    function generateObstacles(scene) {
+        // Nombre d'obstacles à générer
+        var numberOfObstacles = 5;
+
+        for (var i = 0; i < numberOfObstacles; i++) {
+            // Choisissez aléatoirement entre une poubelle, un banc ou une boîte
+            var obstacleType = Math.floor(Math.random() * 3);
+
+            // Position aléatoire sur le sol
+            var obstaclePosition = new BABYLON.Vector3(
+                Math.random() * -20 -10, // X position commence en -10 minimum
+                0.5,                      // Y position (hauteur fixe)
+                0  // Z position fixe car jeu en iso
+            );
+
+            // Créer l'obstacle en fonction du type choisi
+            var obstacle;
+            if (obstacleType === 0) {
+                // Poubelle
+                obstacle = BABYLON.MeshBuilder.CreateCylinder("poubelle", { diameterTop: 1, diameterBottom: 1, height: 1.5 }, scene);
+            } else if (obstacleType === 1) {
+                // Banc
+                obstacle = BABYLON.MeshBuilder.CreateBox("banc", { width: 1.5, height: 1.5, depth: 4 }, scene);
+            } else {
+                // Boîte
+                obstacle = BABYLON.MeshBuilder.CreateBox("boite", { size: 1 }, scene);
+            }
+
+            obstacle.position = obstaclePosition;
+        }
+    }
+
+    window.initFunction = async function () {
+        var asyncEngineCreation = async function () {
+            try {
+                return createDefaultEngine();
+            } catch (e) {
+                console.log("the available createEngine function failed. Creating the default engine instead");
+                return createDefaultEngine();
+            }
+        }
+
+        window.engine = await asyncEngineCreation();
+        if (!engine) throw 'engine should not be null.';
+        startRenderLoop(engine, canvas);
+        window.scene = createScene();
+    };
+    initFunction().then(() => {
+        sceneToRender = scene
+    });
+
+    // Resize
+    window.addEventListener("resize", function () {
+        engine.resize();
+    });
+</script>
+</body>
+</html>
