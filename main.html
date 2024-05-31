@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeu de lancer avec Babylon.js</title>
+    <style>
+        canvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        #messages {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+<canvas id="renderCanvas"></canvas>
+<div id="messages"></div>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="https://cdn.babylonjs.com/materials/babylonjs.materials.min.js"></script>
+<script>
+    let canvas = document.getElementById("renderCanvas");
+    let messagesDiv = document.getElementById("messages");
+
+    // Babylon.js engine
+    let engine = new BABYLON.Engine(canvas, true);
+
+    // Scene
+    let scene = createScene();
+
+    // Run the render loop
+    engine.runRenderLoop(function () {
+        scene.render();
+    });
+
+    // Resize
+    window.addEventListener("resize", function () {
+        engine.resize();
+    });
+
+    function createScene() {
+        // Create the Babylon.js scene
+        let scene = new BABYLON.Scene(engine);
+
+        // Add a camera to the scene and attach it to the canvas
+        let camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, 5, -10), scene);
+        camera.setTarget(BABYLON.Vector3.Zero());
+        camera.attachControl(canvas, true);
+
+        // Light
+        let light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+        // Grass ground
+        let ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 500, height: 100 }, scene);
+        let groundMaterial = new BABYLON.StandardMaterial("groundMaterial", scene);
+        groundMaterial.diffuseTexture = new BABYLON.Texture("./Assets/grass.jpg", scene);
+        ground.material = groundMaterial;
+
+        // Projectile
+        let projectile = BABYLON.MeshBuilder.CreateSphere("projectile", { diameter: 1 }, scene);
+        let projectileMaterial = new BABYLON.StandardMaterial("projectileMaterial", scene);
+        projectileMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.1);
+        projectile.material = projectileMaterial;
+        projectile.position.y = 1; // Position initiale du projectile
+        projectile.isVisible = false;
+
+        // Arrow
+        let arrow = BABYLON.MeshBuilder.CreateCylinder("arrow", { diameterTop: 0, diameterBottom: 0.5, height: 3, tessellation: 20 }, scene);
+        arrow.position.y = 1; // Position de la flèche
+        arrow.rotation.z = Math.PI / 2; // Rotation initiale de la flèche
+
+        // Variable pour stocker la puissance
+        let power = 0;
+
+        // Event listener pour la puissance
+        let isPowerCharging = false;
+        let isGameRunning = false; // Pour éviter le démarrage multiple du jeu
+
+        document.addEventListener('keydown', function (event) {
+            if (!isGameRunning && event.code === 'Space' && !isPowerCharging) {
+                isPowerCharging = true;
+                chargePower();
+            }
+        });
+
+        // Charge la puissance
+        function chargePower() {
+            let powerInterval = setInterval(function () {
+                power += 1;
+                if (power > 100) {
+                    power = 100; // Limiter la puissance maximale
+                }
+                updateMessage('Puissance : ' + power);
+            }, 100);
+
+            // Arrête la charge après 1 seconde
+            setTimeout(function () {
+                clearInterval(powerInterval);
+                isPowerCharging = false;
+                updateMessage('');
+                if (!isGameRunning) {
+                    throwProjectile();
+                    isGameRunning = true;
+                }
+            }, 3000);
+        }
+
+        // Lancer le projectile
+        function throwProjectile() {
+            projectile.isVisible = true;
+            projectile.position.x = -5; // Position initiale X du projectile
+
+            // Animer le projectile
+            let gravity = 0.1;
+            let initialVelocity = power * 0.1; // Plus la puissance est grande, plus la vitesse initiale est élevée
+
+            scene.registerBeforeRender(function throwLoop() {
+                projectile.position.x += initialVelocity;
+                projectile.position.y -= gravity;
+                gravity += 0.005; // Augmenter la gravité
+
+                // Si le projectile touche le sol
+                if (projectile.position.y <= 0) {
+                    projectile.isVisible = false;
+                    scene.unregisterBeforeRender(throwLoop);
+                    let score = Math.round(projectile.position.x); // Score basé sur la distance
+                    updateMessage('Votre score est de : ' + score + ' mètres !');
+                    alert('Votre score est de : ' + score + ' mètres !');
+                    reset();
+                }
+            });
+        }
+
+        // Réinitialiser le jeu
+        function reset() {
+            power = 0;
+            isGameRunning = false;
+            updateMessage('');
+        }
+
+        // Mettre à jour les messages
+        function updateMessage(message) {
+            messagesDiv.innerText = message;
+        }
+
+        return scene;
+    }
+</script>
+</body>
+</html>
